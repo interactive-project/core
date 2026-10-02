@@ -16,10 +16,19 @@ export interface StatePorts{
  evaluate(state:ReadonlyJsonValue,context:RuntimeContext,revision:number):Result;
  dispose?():MaybePromise<void>;
 }
+export interface PersistenceOptions{
+ contentDigest:string;
+ validateSnapshot(input:unknown,expected:Record<string,string|undefined>):{valid:boolean};
+ validateState(input:unknown,activity:Frozen<ActivitySpec>):{valid:boolean};
+ validateDrivers(input:unknown):{valid:boolean};
+ serializeDrivers?():JsonValue;
+ nextGenerationId():string;cancelEffects?():unknown;
+}
 export interface RuntimeOptions{
  activity:ActivitySpec;sessionId:string;attemptId?:string;sourceId:string;engineId:string;engineStateVersion:string;
  clock():number;random():number;nextEventId():string;services?:Record<string,unknown>;ports:StatePorts;
  validators:{activity(input:unknown):{valid:boolean};action(input:unknown,expected?:RuntimeContext['identity']):{valid:boolean};result(input:unknown,expected?:RuntimeContext['identity']):{valid:boolean};event(input:unknown):{valid:boolean}};
+ persistence?:PersistenceOptions;
  onDiagnostic?(diagnostic:Readonly<{code:string}>):unknown;
 }
 export interface RuntimeSession{
@@ -29,7 +38,7 @@ export interface RuntimeSession{
  complete(options?:{signal?:CancellationSignal}):void;fail(options?:{code?:string;phase?:'initialization'|'dispatch'|'evaluation'|'restore'}):void;
  subscribe(listener:(state:ReadonlyRuntimeState)=>unknown):()=>void;
  subscribeEvents(listener:(event:Frozen<ActivityEvent>)=>unknown,options?:{replay?:boolean}):()=>void;
- getState():ReadonlyRuntimeState;flushEvents():void;dispose():void;serialize():Snapshot;restore(snapshot:Snapshot):void;
+ getState():ReadonlyRuntimeState;flushEvents():void;dispose():void;serialize():Snapshot;restore(snapshot:Snapshot,options?:{signal?:CancellationSignal}):void;getDriverSnapshot():ReadonlyJsonValue|null;getEffectContext():Readonly<{activityId:string;sessionId:string;attemptId?:string;generation:string;revision:number}>;
 }
 export declare class RuntimeError extends Error{readonly code:string;readonly path:string}
 export declare function createRuntime(options:RuntimeOptions):RuntimeSession;

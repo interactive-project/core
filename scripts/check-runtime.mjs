@@ -28,7 +28,7 @@ for(const ports of [reducer,machine]){
  runtime.complete();assert.equal(runtime.getState().lifecycle,'completed');assert.equal(runtime.getState().result.score.value,1);
  assert.throws(()=>runtime.start(),e=>e.code==='runtime.lifecycle');
  runtime.dispose();runtime.dispose();assert.equal(runtime.getState().lifecycle,'disposed');assert.equal(runtime.dispatch(action(1)).code,'action.disposed');
- assert.throws(()=>runtime.subscribe(()=>{}),e=>e.code==='runtime.disposed');assert.throws(()=>runtime.serialize(),e=>e.code==='runtime.snapshotUnavailable');
+ assert.throws(()=>runtime.subscribe(()=>{}),e=>e.code==='runtime.disposed');assert.throws(()=>runtime.serialize(),e=>e.code==='runtime.disposed');
  assert(diagnostics.includes('runtime.observer'));histories.push({phases,events});
 }
 assert.deepEqual(histories[0],histories[1],'Reducer and state-machine adapters have identical lifecycle/event traces');

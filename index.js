@@ -4,11 +4,17 @@ export class RuntimeError extends Error{constructor(code,path=''){super('Runtime
 const error=(code,path='')=>new RuntimeError(code,path);
 function sync(fn,...args){try{const value=fn(...args);if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw error('runtime.async');}return value;}catch(failure){if(failure instanceof RuntimeError)throw failure;throw error('runtime.engine');}}
 function json(value){const copied=copyGeneratedJson(value,{maxBytes:2097152,maxDepth:32,maxCollectionSize:2000,maxStringLength:100000,maxNodes:50000});if(!copied.valid)throw error('runtime.nonJson');return copied.value;}
+const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const fallbackId='00000000-0000-4000-8000-000000000000';
 export function createRuntime(options){
+ options=options?{...options}:options;
  if(!options||!options.ports||!options.validators||!['clock','random','nextEventId'].every(k=>typeof options[k]==='function')||!['activity','action','result','event'].every(k=>typeof options.validators[k]==='function')||!['initialState','reduce','evaluate'].every(k=>typeof options.ports[k]==='function'))throw error('runtime.options');
  const validators={...options.validators},ports={...options.ports},activity=json(options.activity);
  if(sync(validators.activity,activity)?.valid!==true)throw error('runtime.activity');
+ const persistence=options.persistence?{...options.persistence}:null;
+ if(persistence&&(!/^[0-9a-f]{64}$/.test(persistence.contentDigest)||!['validateSnapshot','validateState','validateDrivers','nextGenerationId'].every(k=>typeof persistence[k]==='function')))throw error('runtime.persistence');
+ let restoredDrivers=null;
+ let generation=persistence?sync(persistence.nextGenerationId):null;if(persistence&&!uuid.test(generation))throw error('runtime.generation');
  const identity=Object.freeze({activityId:activity.id,sessionId:options.sessionId,attemptId:options.attemptId});
  const clock=options.clock,random=options.random,nextEventId=options.nextEventId,diagnostic=options.onDiagnostic;
  const context=Object.freeze({identity,services:Object.freeze({...options.services}),clock:()=>{const v=sync(clock);if(!Number.isSafeInteger(v)||v<0)throw error('runtime.clock');return v;},random:()=>{const v=sync(random);if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>=1)throw error('runtime.random');return v;}});
@@ -23,12 +29,12 @@ export function createRuntime(options){
  }
  function flushEvents(){if(disposed)return;bus.flush();while(outbox.length){const result=bus.publish(outbox[0]);if(!result.accepted){report(result.code);break;}outbox.shift();}bus.flush();}
  function notify(){const snapshot=view;for(const record of [...listeners]){if(!record.active)continue;try{const r=record.listener(snapshot);if(r&&typeof r.then==='function')Promise.resolve(r).catch(()=>report('runtime.observer'));}catch{report('runtime.observer');}}}
- function commit(next,event){
+ function commit(next,event,onCommit){
   if(disposed||disposeRequested)throw error('runtime.disposed');
   flushEvents();if(outbox.length)throw error('runtime.eventsBlocked');
   const stats=bus.stats(),bytes=new TextEncoder().encode(JSON.stringify(event)).byteLength;
   if(stats.pending>=128||stats.pendingBytes+bytes>4194304)throw error('runtime.backpressure');
-  view=json(next);eventSequence++;outbox.push(event);notify();flushEvents();
+  view=json(next);onCommit?.();eventSequence++;outbox.push(event);notify();flushEvents();
  }
  function operation(allowed,signal,fn){
   if(disposed)throw error('runtime.disposed');
@@ -63,7 +69,7 @@ export function createRuntime(options){
    if(!reduced||reduced.accepted!==true)return reject('action.invalid');
    const next=json({...view,state:reduced.state,revision:view.revision+1});
    const event=makeEvent('activity.interacted',{actionId:action.id,actionType:action.type,revision:next.revision});
-   commit(next,event);actionSequence++;return{status:'accepted',actionId:action.id,revision:next.revision};
+   commit(next,event,()=>{actionSequence++;});return{status:'accepted',actionId:action.id,revision:next.revision};
   });
  }
  function evaluate({signal}={}){return operation(['active','paused'],signal,()=>currentResult(signal));}
@@ -79,8 +85,31 @@ export function createRuntime(options){
   if(disposed)return;if(busy){disposeRequested=true;return;}disposed=true;disposeRequested=false;view=json({...view,lifecycle:'disposed'});bus.dispose();outbox.length=0;notify();for(const record of listeners){record.active=false;record.listener=null;}listeners.clear();
   try{const r=ports.dispose?.();if(r&&typeof r.then==='function')Promise.resolve(r).catch(()=>report('runtime.cleanup'));}catch{report('runtime.cleanup');}
  }
+ function snapshotExpected(){return{activityId:activity.id,activityType:activity.type,activitySchemaVersion:activity.activitySchemaVersion,contentDigest:persistence.contentDigest,engineId:options.engineId,engineStateVersion:options.engineStateVersion,sessionId:identity.sessionId,attemptId:identity.attemptId};}
+ function checkPortable(snapshot){
+  if(sync(persistence.validateSnapshot,snapshot,snapshotExpected())?.valid!==true)throw error('runtime.snapshot');
+  const s=snapshot.state;if(!s||Object.keys(s).some(k=>!['runtimeVersion','lifecycle','actionSequence','domain','result'].includes(k))||s.runtimeVersion!=='1.0.0'||!['created','active','paused','completed','failed'].includes(s.lifecycle)||!Number.isSafeInteger(s.actionSequence)||s.actionSequence!==snapshot.session.revision||!Object.hasOwn(s,'domain'))throw error('runtime.snapshotState');
+  if(sync(persistence.validateState,s.domain,activity)?.valid!==true||sync(persistence.validateDrivers,snapshot.drivers??{})?.valid!==true)throw error('runtime.snapshotState');
+  if(s.result!==undefined&&(sync(validators.result,s.result,identity)?.valid!==true||s.result.revision!==snapshot.session.revision||!['completed','failed'].includes(s.lifecycle)))throw error('runtime.snapshotState');
+  if(s.lifecycle==='completed'&&(!s.result||!['completed','unevaluable'].includes(s.result.status)))throw error('runtime.snapshotState');
+  if(s.lifecycle==='failed'&&s.result!==undefined&&s.result.status!=='failed')throw error('runtime.snapshotState');
+ }
+ function serialize(){return operation(['created','active','paused','completed','failed'],undefined,()=>{
+  if(!persistence)throw error('runtime.snapshotUnavailable');
+  const snapshot=json({protocolVersion:'1.0.0',snapshotVersion:'1.0.0',activity:{id:activity.id,type:activity.type,activitySchemaVersion:activity.activitySchemaVersion,contentDigest:persistence.contentDigest},engine:{id:options.engineId,stateVersion:options.engineStateVersion},session:{id:identity.sessionId,...(identity.attemptId!==undefined?{attemptId:identity.attemptId}:{}),revision:view.revision},state:{runtimeVersion:'1.0.0',lifecycle:view.lifecycle,actionSequence,domain:view.state,...(view.result!==undefined?{result:view.result}:{})},drivers:restoredDrivers??sync(persistence.serializeDrivers??(()=>({})))});
+  checkPortable(snapshot);return snapshot;
+ });}
+ function restore(input,{signal}={}){return operation(['created','active','paused','completed','failed'],signal,()=>{
+  if(!persistence)throw error('runtime.snapshotUnavailable');
+  const snapshot=json(input);checkPortable(snapshot);const next=json({lifecycle:snapshot.state.lifecycle,revision:snapshot.session.revision,state:snapshot.state.domain,...(snapshot.state.result!==undefined?{result:snapshot.state.result}:{})});
+  const nextGeneration=sync(persistence.nextGenerationId);if(!uuid.test(nextGeneration)||nextGeneration===generation)throw error('runtime.generation');
+  const event=makeEvent('activity.interacted',{actionId:sync(nextEventId),actionType:'interactive-project/restore',revision:next.revision});
+  if(signal?.aborted)throw error('runtime.cancelled');
+  commit(next,event,()=>{actionSequence=snapshot.state.actionSequence;generation=nextGeneration;restoredDrivers=snapshot.drivers??json({});});
+  try{const r=persistence.cancelEffects?.();if(r&&typeof r.then==='function')Promise.resolve(r).catch(()=>report('runtime.cleanup'));}catch{report('runtime.cleanup');}
+ });}
  const created=makeEvent('activity.created',{engineId:options.engineId,engineStateVersion:options.engineStateVersion});outbox.push(created);eventSequence++;flushEvents();
- return Object.freeze({start,pause,resume,dispatch,evaluate,complete,fail,subscribe,subscribeEvents:bus.subscribe,flushEvents,dispose,getState:()=>view,serialize:()=>{throw error('runtime.snapshotUnavailable');},restore:()=>{throw error('runtime.snapshotUnavailable');}});
+ return Object.freeze({start,pause,resume,dispatch,evaluate,complete,fail,subscribe,subscribeEvents:bus.subscribe,flushEvents,dispose,getState:()=>view,serialize,restore,getDriverSnapshot:()=>{if(disposed)throw error('runtime.disposed');return restoredDrivers;},getEffectContext:()=>{if(disposed)throw error('runtime.disposed');if(!persistence)throw error('runtime.snapshotUnavailable');return Object.freeze({...identity,generation,revision:view.revision});}});
 }
 export function stateMachinePorts({initial,transition,evaluate,dispose}){
  if(typeof initial!=='function'||typeof transition!=='function'||typeof evaluate!=='function')throw error('runtime.options');
