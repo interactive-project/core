@@ -2,6 +2,8 @@ import type {ActivitySpec,JsonValue} from '@interactive-project/protocol/types';
 import type {Action,Result,DispatchResult,CancellationSignal,Snapshot,MaybePromise} from '@interactive-project/protocol/interoperability';
 import type {ActivityEvent} from '@interactive-project/events';
 export type Frozen<T>=T extends object?{readonly [P in keyof T]:Frozen<T[P]>}:T;
+export type ReadonlyJsonValue=null|boolean|number|string|readonly ReadonlyJsonValue[]|{readonly [key:string]:ReadonlyJsonValue};
+export interface ReadonlyRuntimeState{readonly lifecycle:Lifecycle;readonly revision:number;readonly state:ReadonlyJsonValue;readonly result?:Frozen<Result>}
 export type Lifecycle='created'|'active'|'paused'|'completed'|'failed'|'disposed';
 export interface RuntimeState{lifecycle:Lifecycle;revision:number;state:JsonValue;result?:Result}
 export interface RuntimeContext{
@@ -10,8 +12,8 @@ export interface RuntimeContext{
 }
 export interface StatePorts{
  initialState(activity:Frozen<ActivitySpec>,context:RuntimeContext):JsonValue;
- reduce(state:Frozen<JsonValue>,action:Frozen<Action>,context:RuntimeContext):{accepted:true;state:JsonValue}|{accepted:false};
- evaluate(state:Frozen<JsonValue>,context:RuntimeContext,revision:number):Result;
+ reduce(state:ReadonlyJsonValue,action:Frozen<Action>,context:RuntimeContext):{accepted:true;state:JsonValue}|{accepted:false};
+ evaluate(state:ReadonlyJsonValue,context:RuntimeContext,revision:number):Result;
  dispose?():MaybePromise<void>;
 }
 export interface RuntimeOptions{
@@ -25,10 +27,10 @@ export interface RuntimeSession{
  dispatch(action:Action,options?:{signal?:CancellationSignal}):DispatchResult;
  evaluate(options?:{signal?:CancellationSignal}):Result;
  complete(options?:{signal?:CancellationSignal}):void;fail(options?:{code?:string;phase?:'initialization'|'dispatch'|'evaluation'|'restore'}):void;
- subscribe(listener:(state:Frozen<RuntimeState>)=>unknown):()=>void;
+ subscribe(listener:(state:ReadonlyRuntimeState)=>unknown):()=>void;
  subscribeEvents(listener:(event:Frozen<ActivityEvent>)=>unknown,options?:{replay?:boolean}):()=>void;
- getState():Frozen<RuntimeState>;flushEvents():void;dispose():void;serialize():Snapshot;restore(snapshot:Snapshot):void;
+ getState():ReadonlyRuntimeState;flushEvents():void;dispose():void;serialize():Snapshot;restore(snapshot:Snapshot):void;
 }
 export declare class RuntimeError extends Error{readonly code:string;readonly path:string}
 export declare function createRuntime(options:RuntimeOptions):RuntimeSession;
-export declare function stateMachinePorts(options:{initial:StatePorts['initialState'];transition(state:Frozen<JsonValue>,action:Frozen<Action>,context:RuntimeContext):JsonValue;evaluate:StatePorts['evaluate'];dispose?:StatePorts['dispose']}):StatePorts;
+export declare function stateMachinePorts(options:{initial:StatePorts['initialState'];transition(state:ReadonlyJsonValue,action:Frozen<Action>,context:RuntimeContext):JsonValue;evaluate:StatePorts['evaluate'];dispose?:StatePorts['dispose']}):StatePorts;

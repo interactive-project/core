@@ -2,7 +2,7 @@ import {copyGeneratedJson} from '@interactive-project/protocol/generation/json';
 import {createEventBus} from '@interactive-project/events/bus';
 export class RuntimeError extends Error{constructor(code,path=''){super('Runtime operation rejected.');this.name='RuntimeError';this.code=code;this.path=path;}}
 const error=(code,path='')=>new RuntimeError(code,path);
-function sync(fn,...args){const value=fn(...args);if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw error('runtime.async');}return value;}
+function sync(fn,...args){try{const value=fn(...args);if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw error('runtime.async');}return value;}catch(failure){if(failure instanceof RuntimeError)throw failure;throw error('runtime.engine');}}
 function json(value){const copied=copyGeneratedJson(value,{maxBytes:2097152,maxDepth:32,maxCollectionSize:2000,maxStringLength:100000,maxNodes:50000});if(!copied.valid)throw error('runtime.nonJson');return copied.value;}
 const fallbackId='00000000-0000-4000-8000-000000000000';
 export function createRuntime(options){
@@ -11,13 +11,13 @@ export function createRuntime(options){
  if(sync(validators.activity,activity)?.valid!==true)throw error('runtime.activity');
  const identity=Object.freeze({activityId:activity.id,sessionId:options.sessionId,attemptId:options.attemptId});
  const clock=options.clock,random=options.random,nextEventId=options.nextEventId,diagnostic=options.onDiagnostic;
- const context=Object.freeze({identity,services:Object.freeze({...options.services}),clock:()=>{const v=clock();if(!Number.isSafeInteger(v)||v<0)throw error('runtime.clock');return v;},random:()=>{const v=random();if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>=1)throw error('runtime.random');return v;}});
+ const context=Object.freeze({identity,services:Object.freeze({...options.services}),clock:()=>{const v=sync(clock);if(!Number.isSafeInteger(v)||v<0)throw error('runtime.clock');return v;},random:()=>{const v=sync(random);if(typeof v!=='number'||!Number.isFinite(v)||v<0||v>=1)throw error('runtime.random');return v;}});
  let view=json({lifecycle:'created',revision:0,state:sync(ports.initialState,activity,context)}),busy=false,disposed=false,disposeRequested=false,actionSequence=0,eventSequence=0,reporting=false;
  const listeners=new Set(),outbox=[];
  function report(code){if(reporting||typeof diagnostic!=='function')return;reporting=true;try{const r=diagnostic(Object.freeze({code}));if(r&&typeof r.then==='function')Promise.resolve(r).catch(()=>{});}catch{}finally{reporting=false;}}
  const bus=createEventBus({activityId:activity.id,sessionId:options.sessionId,sourceId:options.sourceId,validate:validators.event,onDiagnostic:d=>report(d.code)});
  function makeEvent(type,payload){
-  const event=json({protocolVersion:'1.0.0',eventVersion:'1.0.0',id:nextEventId(),type:'interactive-project/'+type,activityId:activity.id,activityType:activity.type,sessionId:options.sessionId,...(options.attemptId!==undefined?{attemptId:options.attemptId}:{}),sourceId:options.sourceId,sequence:eventSequence,timestamp:context.clock(),payload});
+  const event=json({protocolVersion:'1.0.0',eventVersion:'1.0.0',id:sync(nextEventId),type:'interactive-project/'+type,activityId:activity.id,activityType:activity.type,sessionId:options.sessionId,...(options.attemptId!==undefined?{attemptId:options.attemptId}:{}),sourceId:options.sourceId,sequence:eventSequence,timestamp:context.clock(),payload});
   if(sync(validators.event,event)?.valid!==true)throw error('runtime.event');
   return event;
  }
@@ -45,8 +45,8 @@ export function createRuntime(options){
   return result;
  }
  function start({signal}={}){return operation(['created'],signal,()=>{const event=makeEvent('activity.started',{revision:view.revision});commit({...view,lifecycle:'active'},event);});}
- function pause({signal}={}){return operation(['active'],signal,()=>{const event=makeEvent('activity.interacted',{actionId:nextEventId(),actionType:'interactive-project/pause',revision:view.revision});commit({...view,lifecycle:'paused'},event);});}
- function resume({signal}={}){return operation(['paused'],signal,()=>{const event=makeEvent('activity.interacted',{actionId:nextEventId(),actionType:'interactive-project/resume',revision:view.revision});commit({...view,lifecycle:'active'},event);});}
+ function pause({signal}={}){return operation(['active'],signal,()=>{const event=makeEvent('activity.interacted',{actionId:sync(nextEventId),actionType:'interactive-project/pause',revision:view.revision});commit({...view,lifecycle:'paused'},event);});}
+ function resume({signal}={}){return operation(['paused'],signal,()=>{const event=makeEvent('activity.interacted',{actionId:sync(nextEventId),actionType:'interactive-project/resume',revision:view.revision});commit({...view,lifecycle:'active'},event);});}
  function dispatch(input,{signal}={}){
   const copied=copyGeneratedJson(input,{maxBytes:1048576,maxDepth:32,maxCollectionSize:1000,maxStringLength:4000,maxNodes:10000});
   const action=copied.valid?copied.value:null;

@@ -8,7 +8,7 @@ Creation validates already supplied ActivitySpec, initial state and a created ev
 
 completed/failed are terminal until disposal: no new domain actions or lifecycle restart. Structured RuntimeError carries static safe message, code and pointer for invalid lifecycle, busy/disposed/cancelled operation, unsupported async/snapshot support, invalid JSON/activity/result/event or invalid injected source. Dispatch rejects using Protocol action.disposed/busy/invalid/identity/stale as appropriate. Invalid JSON without an authenticated action UUID uses the documented reserved fallback action ID 00000000-0000-4000-8000-000000000000 solely for diagnostics, never as an accepted action identity. No native exception text is forwarded by the validation/event observer boundary.
 
-This initial runtime accepts a synchronous StatePorts implementation: initialState, pure reduce returning accepted/candidate state or rejected, evaluate returning a Protocol Result, and optional dispose. Reducer exceptions propagate only as live host implementation errors; callers must treat these as failed uncommitted work and never expose native messages to users/telemetry. Later core#3 supplies correlated asynchronous effects/failure orchestration.
+This initial runtime accepts a synchronous StatePorts implementation: initialState, pure reduce returning accepted/candidate state or rejected, evaluate returning a Protocol Result, and optional dispose. Reducer/validator/injected-source exceptions become runtime.engine with static safe text; throwing reducers leave candidate work uncommitted and do not expose native messages to users/telemetry. Later core#3 supplies correlated asynchronous effects/failure orchestration.
 
 ## Atomic state and observers
 
