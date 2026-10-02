@@ -66,4 +66,17 @@ const result=c=>({protocolVersion:'1.0.0',resultVersion:'1.0.0',activityId:c.act
  const late=defer();const q=evaluateAfterEffects({coordinator:f.coordinator,getCurrent:()=>f.context,evaluate:()=>late.promise,validateResult});await tick();f.context.revision++;late.resolve(result(f.context));await assert.rejects(q,code('effect.stale'));
  await assert.rejects(evaluateAfterEffects({coordinator:f.coordinator,getCurrent:()=>f.context,evaluate:()=>new Promise(()=>{}),validateResult},{timeoutMs:10}),code('effect.evaluationTimeout'));f.coordinator.dispose();
 }
+{
+ const {createRuntime}=await import('../index.js');
+ const {validateActivitySpec}=await import('@interactive-project/protocol/validation');
+ const {validateEvent}=await import('@interactive-project/events/validation');
+ let event=400,actionId=500;
+ const runtime=createRuntime({activity:{protocolVersion:'1.0.0',id:uuid(1),type:'interactive-project/quiz',activitySchemaVersion:'0.0.1',metadata:{title:'Effect integration'},config:{}},sessionId:uuid(2),attemptId:uuid(3),sourceId:uuid(6),engineId:'fixtures/effects',engineStateVersion:'0.0.1',clock:()=>0,random:()=>0.5,nextEventId:()=>uuid(event++),validators:{activity:validateActivitySpec,action:validateAction,result:validateResult,event:validateEvent},ports:{initialState:()=>({output:null}),reduce:(_s,a)=>({accepted:true,state:{output:a.payload.output}}),evaluate:(_s,c,r)=>result({...c.identity,revision:r})}});
+ runtime.start();
+ const current=()=>({activityId:uuid(1),sessionId:uuid(2),attemptId:uuid(3),generation:uuid(4),revision:runtime.getState().revision});
+ const coordinator=createEffectCoordinator({getCurrent:current,applyAction:runtime.dispatch,nextActionId:()=>uuid(actionId++),nextActionSequence:()=>runtime.getState().revision,services:{'fixtures/run':{permissions:[],execute:()=>({value:42})}}});
+ await coordinator.submit({effectVersion:'1.0.0',id:uuid(10),...current(),type:'fixtures/run',lane:'fixtures/code',input:null});
+ assert.equal(runtime.getState().state.output.value,42);assert.equal(runtime.getState().revision,1);assert.equal(runtime.evaluate().score.value,0);
+ coordinator.dispose();runtime.dispose();
+}
 console.log('Effects: correlation, supersession, disposal, permissions, retry, timeout, cancellation, bounded replay and evaluation passed.');

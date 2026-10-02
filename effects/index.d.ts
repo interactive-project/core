@@ -20,4 +20,4 @@ export interface EffectCoordinator{
 }
 export declare class EffectError extends Error{readonly code:string}
 export declare function createEffectCoordinator(options:EffectOptions):EffectCoordinator;
-export declare function evaluateAfterEffects(options:{coordinator:EffectCoordinator;getCurrent():EffectContext;evaluate(options:{signal:CancellationSignal}):MaybePromise<Result>;validateResult(input:unknown,expected?:{activityId:string;sessionId:string;attemptId?:string}):{valid:boolean}},options?:{signal?:CancellationSignal;timeoutMs?:number}):Promise<Result>;
+export declare function evaluateAfterEffects(options:{coordinator:EffectCoordinator;getCurrent():EffectContext;evaluate(options:{signal:CancellationSignal}):MaybePromise<Result>;validateResult(input:unknown,expected?:{activityId:string;sessionId:string;attemptId?:string}):{valid:boolean}},waitOptions?:{signal?:CancellationSignal;timeoutMs?:number}):Promise<Result>;
