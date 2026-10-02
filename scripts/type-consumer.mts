@@ -12,3 +12,7 @@ const ports=stateMachinePorts({initial:()=>({value:'ready'}),transition:()=>({va
 import {loadActivity,type LoadOptions} from '@interactive-project/core/loading';
 declare const loadOptions:LoadOptions;
 const loaded=await loadActivity({},loadOptions);if(loaded.loaded){loaded.dispose();}else{const stage:string=loaded.stage;void stage;}
+
+import {createEffectCoordinator,type EffectOptions} from '@interactive-project/core/effects';
+declare const effectOptions:EffectOptions;
+const effects=createEffectCoordinator(effectOptions);const pending:number=effects.pending();void pending;
