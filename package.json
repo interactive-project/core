@@ -12,7 +12,8 @@
     "README.md",
     "loading",
     "effects",
-    "schemas"
+    "schemas",
+    "persistence"
   ],
   "exports": {
     ".": {
@@ -30,10 +31,15 @@
       "import": "./effects/index.js",
       "default": "./effects/index.js"
     },
-    "./schemas/effect-request.v1.schema.json": "./schemas/effect-request.v1.schema.json"
+    "./schemas/effect-request.v1.schema.json": "./schemas/effect-request.v1.schema.json",
+    "./persistence": {
+      "types": "./persistence/index.d.ts",
+      "import": "./persistence/index.js",
+      "default": "./persistence/index.js"
+    }
   },
   "scripts": {
-    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs && node scripts/check-effects.mjs"
+    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs && node scripts/check-effects.mjs && node scripts/check-persistence.mjs"
   },
   "peerDependencies": {
     "@interactive-project/protocol": "0.1.0",

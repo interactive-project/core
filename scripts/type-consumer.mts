@@ -16,3 +16,6 @@ const loaded=await loadActivity({},loadOptions);if(loaded.loaded){loaded.dispose
 import {createEffectCoordinator,type EffectOptions} from '@interactive-project/core/effects';
 declare const effectOptions:EffectOptions;
 const effects=createEffectCoordinator(effectOptions);const pending:number=effects.pending();void pending;
+
+import {createPersistentRuntime,migrateSnapshot,snapshotSignature} from '../persistence/index.js';
+void createPersistentRuntime;void migrateSnapshot;void snapshotSignature;
