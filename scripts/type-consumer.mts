@@ -8,3 +8,7 @@ runtime.subscribe(view=>{
  view.lifecycle='active';
 });
 const ports=stateMachinePorts({initial:()=>({value:'ready'}),transition:()=>({value:'done'}),evaluate:options.ports.evaluate});void ports;
+
+import {loadActivity,type LoadOptions} from '@interactive-project/core/loading';
+declare const loadOptions:LoadOptions;
+const loaded=await loadActivity({},loadOptions);if(loaded.loaded){loaded.dispose();}else{const stage:string=loaded.stage;void stage;}

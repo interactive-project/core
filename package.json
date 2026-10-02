@@ -9,21 +9,30 @@
     "index.d.ts",
     "types",
     "docs",
-    "README.md"
+    "README.md",
+    "loading"
   ],
   "exports": {
     ".": {
       "types": "./index.d.ts",
       "import": "./index.js",
       "default": "./index.js"
+    },
+    "./loading": {
+      "types": "./loading/index.d.ts",
+      "import": "./loading/index.js",
+      "default": "./loading/index.js"
     }
   },
   "scripts": {
-    "test": "node scripts/check-runtime.mjs"
+    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs"
   },
   "peerDependencies": {
     "@interactive-project/protocol": "0.1.0",
-    "@interactive-project/events": "0.1.0"
+    "@interactive-project/events": "0.1.0",
+    "@interactive-project/registry": "0.1.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
     "@interactive-project/protocol": "git+https://github.com/interactive-project/protocol.git#0280e004ba863621a257b96819f34295c8db0ea7",
@@ -32,5 +41,13 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "typescript": "^5.9.3"
+  },
+  "peerDependenciesMeta": {
+    "ajv": {
+      "optional": true
+    },
+    "ajv-formats": {
+      "optional": true
+    }
   }
 }
