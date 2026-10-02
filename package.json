@@ -10,7 +10,9 @@
     "types",
     "docs",
     "README.md",
-    "loading"
+    "loading",
+    "effects",
+    "schemas"
   ],
   "exports": {
     ".": {
@@ -22,10 +24,16 @@
       "types": "./loading/index.d.ts",
       "import": "./loading/index.js",
       "default": "./loading/index.js"
-    }
+    },
+    "./effects": {
+      "types": "./effects/index.d.ts",
+      "import": "./effects/index.js",
+      "default": "./effects/index.js"
+    },
+    "./schemas/effect-request.v1.schema.json": "./schemas/effect-request.v1.schema.json"
   },
   "scripts": {
-    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs"
+    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs && node scripts/check-effects.mjs"
   },
   "peerDependencies": {
     "@interactive-project/protocol": "0.1.0",
