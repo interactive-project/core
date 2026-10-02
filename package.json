@@ -1,0 +1,36 @@
+{
+  "name": "@interactive-project/core",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Headless deterministic activity lifecycle runtime",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "types",
+    "docs",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "scripts": {
+    "test": "node scripts/check-runtime.mjs"
+  },
+  "peerDependencies": {
+    "@interactive-project/protocol": "0.1.0",
+    "@interactive-project/events": "0.1.0"
+  },
+  "devDependencies": {
+    "@interactive-project/protocol": "git+https://github.com/interactive-project/protocol.git#0280e004ba863621a257b96819f34295c8db0ea7",
+    "@interactive-project/events": "git+https://github.com/interactive-project/events.git#ebea0bb90db349e9f83b713bfa1871113868671e",
+    "@interactive-project/registry": "git+https://github.com/interactive-project/registry.git#872c1ab6350494113e3dca16f70da60dce6e15eb",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.9.3"
+  }
+}
