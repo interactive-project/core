@@ -39,7 +39,7 @@
     }
   },
   "scripts": {
-    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs && node scripts/check-effects.mjs && node scripts/check-persistence.mjs"
+    "test": "node scripts/check-runtime.mjs && node scripts/check-loading.mjs && node scripts/check-effects.mjs && node scripts/check-persistence.mjs && node scripts/check-vertical-slice.mjs"
   },
   "peerDependencies": {
     "@interactive-project/protocol": "0.1.0",
@@ -50,8 +50,10 @@
   },
   "devDependencies": {
     "@interactive-project/protocol": "git+https://github.com/interactive-project/protocol.git#0280e004ba863621a257b96819f34295c8db0ea7",
-    "@interactive-project/events": "git+https://github.com/interactive-project/events.git#ebea0bb90db349e9f83b713bfa1871113868671e",
-    "@interactive-project/registry": "git+https://github.com/interactive-project/registry.git#872c1ab6350494113e3dca16f70da60dce6e15eb",
+    "@interactive-project/events": "git+https://github.com/interactive-project/events.git#7251000eee1ddefafb8f760aadd8e6ca7f96dfa3",
+    "@interactive-project/registry": "git+https://github.com/interactive-project/registry.git#e6ef81f960cc4cf2ec7a83a57b617d3ed65969a2",
+    "@interactive-project/quiz": "git+https://github.com/interactive-project/quiz.git#e6d2cfd041d518d9eca6bb1270db19fd3619cb8b",
+    "@interactive-project/content-node": "git+https://github.com/interactive-project/content-node.git#276f7970a703035eab6130784046584f51df0534",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "typescript": "^5.9.3"
