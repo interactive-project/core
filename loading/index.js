@@ -8,6 +8,20 @@ class Failure extends Error{constructor(code,path=''){super(code);this.code=code
 const messages={'load.options':'The trusted loading options are invalid.','load.validator':'A trusted synchronous domain validator failed.','load.domainSchema':'The config violates its registered domain schema.','load.semantic':'The activity violates its domain semantic contract.','load.envelope':'The activity violates the shared envelope schema.','load.unknownType':'The activity type is not approved in the catalog.','load.version':'The exact activity schema version is unsupported.','load.permission':'The host denies a required permission.','load.capability':'A required capability or driver is unavailable.','load.catalog':'The approved catalog is invalid or mismatches the registered engine.','load.renderer':'A compatible renderer is unavailable.','load.engine':'The trusted engine factory failed or returned an invalid session.','load.rendererFactory':'The trusted renderer factory failed or returned invalid lifecycle hooks.','load.cancelled':'Loading was cancelled.','load.timeout':'Loading exceeded its deadline.'};
 const diagnostic=(code,path='')=>({code,path,severity:'error',message:messages[code]});
 function synchronous(fn,...args){try{const v=fn(...args);if(v&&typeof v.then==='function'){Promise.resolve(v).catch(()=>{});throw new Failure('load.validator');}return v;}catch{throw new Failure('load.validator');}}
+function catalogEntryMatches(registryEntry,catalogEntry){
+ const comparable=entry=>({
+  type:entry.type,
+  activitySchemaVersion:entry.activitySchemaVersion,
+  schemaId:entry.schemaId,
+  capabilities:Object.fromEntries(capabilities.map(capability=>{
+   const declaration=entry.capabilities[capability];
+   return[capability,{supported:declaration.supported,...(declaration.supported&&declaration.requiredDrivers?.length?{requiredDrivers:[...declaration.requiredDrivers].sort()}: {})}];
+  })),
+  requiredCapabilities:[...entry.requiredCapabilities].sort(),
+  requiredPermissions:[...entry.requiredPermissions].sort()
+ });
+ return canonicalJson(comparable(registryEntry))===canonicalJson(comparable(catalogEntry));
+}
 export async function loadActivity(input,options){
  let stage='structural',abandoned=false,finished=false;
  const callerSignal=options?.signal;
@@ -56,7 +70,7 @@ export async function loadActivity(input,options){
   if(requested.includes('offline')&&requirements.value.permissions.includes('network'))throw new Failure('load.capability','/config');
   const resolved=resolveEngine(options.registry,{type:activity.type,protocolVersion:activity.protocolVersion,activityVersion:{exact:activity.activitySchemaVersion},requiredCapabilities:requested,availableDrivers:driversCopy.value,policy,...(host!==undefined?{host}:{})});
   if(!resolved.resolved)throw new Failure(resolved.rejections.some(r=>r.code==='resolution.renderer')?'load.renderer':'load.capability','/config');
-  if(canonicalJson(resolved.entry)!==canonicalJson(entry))throw new Failure('load.catalog','/config');
+  if(!catalogEntryMatches(resolved.entry,entry))throw new Failure('load.catalog','/config');
   check();stage='engine';
   const engine=await construct(()=>resolved.registration.createEngine(activity,{...engineContext,signal:controller.signal}),'load.engine');
   if(!engine||!['dispatch','evaluate','serialize','restore','dispose'].every(k=>typeof engine[k]==='function'))throw new Failure('load.engine');
